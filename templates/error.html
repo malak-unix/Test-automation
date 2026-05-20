@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Error{% endblock %}
+
+{% block content %}
+<section class="panel error-panel">
+  <p class="eyebrow">FAULT</p>
+  <h2>Workflow could not complete</h2>
+  <p>{{ error }}</p>
+  {% if errors %}
+    <ul>
+      {% for item in errors %}
+        <li>{{ item.agent }} {{ item.field }}: {{ item.message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <a class="secondary-link" href="{{ url_for('index') }}">Back to Home</a>
+</section>
+{% endblock %}

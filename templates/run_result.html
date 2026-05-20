@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Run Result{% endblock %}
+
+{% block content %}
+<section class="panel hero-panel">
+  <div class="section-heading">
+    <p class="eyebrow">MISSION COMPLETE</p>
+    <h2>Run completed</h2>
+    <p><strong>{{ summary.run_id or "unknown" }}</strong> - <span class="status-pill">{{ summary.status or "partial" }}</span></p>
+  </div>
+
+  <div class="cards kpi-grid">
+    <div class="metric"><span>Global score</span><strong>{{ summary.global_score or 0 }}</strong></div>
+    <div class="metric"><span>API pass rate</span><strong>{{ summary.api_summary.pass_rate or 0 }}%</strong></div>
+    <div class="metric"><span>UI pass rate</span><strong>{{ summary.get("ui_summary", {}).get("pass_rate", 0) }}%</strong></div>
+    <div class="metric"><span>Performance p95</span><strong>{{ summary.get("performance_summary", {}).get("p95_response_time_ms") or "n/a" }}</strong></div>
+    <div class="metric"><span>Total anomalies</span><strong>{{ summary.bug_summary.total_anomalies or 0 }}</strong></div>
+    <div class="metric"><span>High anomalies</span><strong>{{ summary.bug_summary.high or 0 }}</strong></div>
+  </div>
+</section>
+
+<section class="panel workflow-panel">
+  <div class="section-heading">
+    <p class="eyebrow">EXECUTION TOPOLOGY</p>
+    <h2>Agent Pipeline</h2>
+  </div>
+  <div class="agent-flow" aria-label="Final workflow">
+    {% for agent in ["orchestrator", "repo_analyzer", "rag", "test_planner", "api_testing", "ui_testing", "performance_testing", "bug_analysis", "report"] %}
+      <span class="{{ 'active' if agent in (summary.selected_agents or []) or agent == 'orchestrator' else '' }}">{{ agent }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">RUN STATE</p>
+  <h2>Run Summary</h2>
+  <dl class="summary-grid">
+    <dt>Framework</dt><dd>{{ summary.framework or "Unknown" }}</dd>
+    <dt>Target URL</dt><dd>{{ summary.target_url or "Not provided" }}</dd>
+    <dt>RAG query</dt><dd>{{ summary.rag_query or "Not available" }}</dd>
+    <dt>Retrieved context</dt><dd>{{ summary.retrieved_context_count or 0 }}</dd>
+    <dt>Selected agents</dt><dd>{{ (summary.selected_agents or [])|join(", ") }}</dd>
+    <dt>Planner mode</dt><dd>{{ summary.get("planner_model_info", {}).get("mode", "unknown") }}</dd>
+    <dt>LLM provider/model</dt><dd>{{ summary.get("planner_model_info", {}).get("provider", "none") }} / {{ summary.get("planner_model_info", {}).get("model") or "none" }}</dd>
+    <dt>MCP tools</dt><dd>{{ "enabled" if summary.use_mcp_tools else "disabled" }}</dd>
+    <dt>MCP fallback used</dt><dd>{{ "yes" if summary.mcp_fallback_used else "no" }}</dd>
+    <dt>Agent log entries</dt><dd>{{ summary.agent_log_count or 0 }}</dd>
+  </dl>
+</section>
+
+<section class="grid-panels">
+  <div class="panel console-panel">
+    <p class="eyebrow">LIVE EXECUTION TIMELINE</p>
+    <h2>Agent Timeline</h2>
+    {% if summary.agent_logs %}
+      <ol class="timeline">
+        {% for log in summary.agent_logs %}
+          <li>
+            <span class="timeline-index">{{ log.index }}</span>
+            <div>
+              <strong>{{ log.agent }}</strong>
+              <span class="status-pill">{{ log.status }}</span>
+              {% if log.timestamp %}<small>{{ log.timestamp }}</small>{% endif %}
+              <p>{{ log.message }}</p>
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="muted">No compact agent log entries were recorded for this view.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel console-panel">
+    <p class="eyebrow">SYSTEM LOGS</p>
+    <h2>Tool Backends</h2>
+    {% if summary.tool_backend_metadata %}
+      <table>
+        <thead><tr><th>Agent</th><th>Backend</th><th>MCP fallback</th></tr></thead>
+        <tbody>
+          {% for agent, metadata in summary.tool_backend_metadata.items() %}
+          <tr>
+            <td>{{ agent }}</td>
+            <td>{{ metadata.tool_backend }}</td>
+            <td>{{ "yes" if metadata.mcp_fallback_used else "no" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Local tools were used or no backend metadata was recorded.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">ARTIFACT MATRIX</p>
+  <h2>Artifact Paths</h2>
+  <table>
+    <tbody>
+      <tr><th>workflow_state.json</th><td>{{ summary.workflow_state_path or "" }}</td></tr>
+      <tr><th>project_info.json</th><td>{{ summary.project_info_path or "" }}</td></tr>
+      <tr><th>test_plan.json</th><td>{{ summary.test_plan_path or "" }}</td></tr>
+      <tr><th>api_result.json</th><td>{{ summary.api_result_path or "" }}</td></tr>
+      <tr><th>ui_result.json</th><td>{{ summary.ui_result_path or "" }}</td></tr>
+      <tr><th>performance_result.json</th><td>{{ summary.performance_result_path or "" }}</td></tr>
+      <tr><th>Performance artifacts</th><td>{{ summary.performance_artifact_count or 0 }}</td></tr>
+      <tr><th>bug_result.json</th><td>{{ summary.bug_result_path or "" }}</td></tr>
+      <tr><th>final_results.json</th><td>{{ summary.final_results_path or "" }}</td></tr>
+      <tr><th>report_result.json</th><td>{{ summary.report_result_path or "" }}</td></tr>
+      <tr><th>HTML report</th><td>{{ summary.report_html_path or "" }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+{% if summary.errors %}
+<section class="panel error-panel">
+  <p class="eyebrow">FAULTS</p>
+  <h2>Errors</h2>
+  <ul>
+    {% for error in summary.errors %}
+      <li>{{ error.agent }} {{ error.field }}: {{ error.message }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="panel report-panel">
+  <p class="eyebrow">REPORT VIEWER</p>
+  <h2>Generated HTML Report</h2>
+  {% if report_html %}
+    <iframe class="report-frame" title="Generated report" srcdoc="{{ report_html|e }}"></iframe>
+  {% else %}
+    <p class="muted">Report HTML not available. Check final_results.json/report_result.json.</p>
+  {% endif %}
+</section>
+{% endblock %}

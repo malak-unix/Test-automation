@@ -1,0 +1,7 @@
+{
+  "testing": {
+    "command": "python",
+    "args": ["mcp_servers/testing_tools_server.py"],
+    "transport": "stdio"
+  }
+}

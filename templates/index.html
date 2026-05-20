@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Run Test Automation{% endblock %}
+
+{% block content %}
+<section class="panel workflow-panel">
+  <div class="section-heading">
+    <p class="eyebrow">MODE SIMPLE</p>
+    <h2>Pipeline Agent Par Agent</h2>
+    <p><strong>Final MVP Workflow:</strong> chaque bloc travaille dans l'ordre. Le projet utilise le LLM Groq/Mistral pour generer le plan de test dans <strong>Test Planner</strong>.</p>
+  </div>
+  <div class="agent-flow" aria-label="Final workflow">
+    <span title="Valide la demande et choisit les agents">1 Orchestrator</span>
+    <span title="Clone/lit le repo sans executer son code">2 Repository</span>
+    <span title="Prepare le contexte depuis les fichiers">3 RAG</span>
+    <span title="Cree le plan de test; seul agent qui peut appeler Groq/Mistral">4 Test Planner</span>
+    <span title="Execute les tests API planifies">5 API</span>
+    <span title="Execute les tests UI planifies avec Selenium">6 UI</span>
+    <span title="Execute une petite charge Locust locale">7 Performance</span>
+    <span title="Classe les anomalies">8 Bug Analysis</span>
+    <span title="Genere le rapport final">9 Report</span>
+  </div>
+</section>
+
+<section class="layout">
+  <form class="panel form-panel" method="post" action="{{ url_for('run') }}">
+    <div class="section-heading">
+      <p class="eyebrow">MISSION INPUT</p>
+      <h2>Run Test Automation</h2>
+      <p>Launch repository analysis, RAG, planning, API/UI/performance checks, bug analysis, and report generation.</p>
+    </div>
+
+    <label>
+      GitHub Repository URL
+      <input type="url" name="repo_url" value="{{ defaults.repo_url }}" placeholder="https://github.com/Vitaee/DjangoRestAPI">
+      <span class="helper-text">Public repositories do not require a GitHub token. Private repositories may require <code>GITHUB_TOKEN</code> in <code>.env</code>.</span>
+    </label>
+
+    <label>
+      Local repository path <span class="muted">optional</span>
+      <input type="text" name="repo_path" placeholder="../DjangoRestAPI">
+      <span class="helper-text">When provided, the local path is used instead of cloning the GitHub URL.</span>
+    </label>
+
+    <label>
+      Target app URL
+      <input type="url" name="target_url" value="{{ defaults.target_url }}" required>
+    </label>
+
+    <label>
+      Focus
+      <input type="text" name="focus" value="{{ defaults.focus }}">
+    </label>
+
+    <div class="field-group">
+      <span class="label-text">Test types</span>
+      <label class="check-row"><input type="checkbox" name="test_types" value="api" checked> API</label>
+      <label class="check-row"><input type="checkbox" name="test_types" value="ui" checked> UI <span>Selenium, si navigateur disponible</span></label>
+      <label class="check-row"><input type="checkbox" name="test_types" value="performance" checked> Performance <span>petite charge Locust locale</span></label>
+    </div>
+
+    <div class="grid-2">
+      <label>
+        Execution mode
+        <select name="execution_mode">
+          <option value="sequential" selected>Sequential</option>
+        </select>
+      </label>
+
+      <label>
+        RAG top k
+        <input type="number" name="rag_top_k" min="1" max="20" value="{{ defaults.rag_top_k }}">
+      </label>
+    </div>
+
+    <div class="field-group">
+      <span class="label-text">Planner mode</span>
+      <input type="hidden" name="planner_use_llm" value="1">
+      <p class="llm-banner">LLM obligatoire: Test Planner appelle Groq/Mistral avec les variables de <code>.env</code>. Les autres agents executent le plan avec des outils.</p>
+      <p class="helper-text">
+        LLM status:
+        provider <strong>{{ llm_config.provider or "none" }}</strong>,
+        model <strong>{{ llm_config.model or "not configured" }}</strong>,
+        available <strong>{{ "yes" if llm_config.available else "no" }}</strong>.
+      </p>
+    </div>
+
+    <div class="field-group">
+      <label class="check-row"><input type="checkbox" name="allow_mutating_api_tests"> Allow mutating API tests</label>
+      <p class="warning">POST/PUT/PATCH/DELETE are skipped unless enabled.</p>
+      <label class="check-row"><input type="checkbox" name="allow_external_performance_test"> Allow external performance target</label>
+      <p class="warning">Performance tests use small safe loads by default and run only against localhost unless explicitly allowed.</p>
+      <label class="check-row"><input type="checkbox" name="skip_ui_testing"> Skip UI Testing</label>
+      <label class="check-row"><input type="checkbox" name="skip_performance_testing"> Skip Performance Testing</label>
+      <label class="check-row"><input type="checkbox" name="skip_bug_analysis"> Skip Bug Analysis</label>
+      <label class="check-row"><input type="checkbox" name="skip_report"> Skip Report</label>
+      <label class="check-row"><input type="checkbox" name="use_mcp_tools"> Use MCP tools when available</label>
+    </div>
+
+    <button type="submit">Run Test Automation</button>
+  </form>
+
+  <div class="side-stack">
+    <aside class="panel console-panel">
+      <p class="eyebrow">GUIDE RAPIDE</p>
+      <h2>Comment lire le dashboard</h2>
+      <ol class="quick-guide">
+        <li><strong>Selected agents</strong>: agents vraiment lances.</li>
+        <li><strong>Planner mode</strong>: LLM obligatoire pour Test Planner.</li>
+        <li><strong>Artifact paths</strong>: fichiers JSON crees par chaque agent.</li>
+        <li><strong>Report viewer</strong>: rapport final lisible pour la presentation.</li>
+      </ol>
+    </aside>
+
+    <aside class="panel console-panel">
+      <p class="eyebrow">RECENT SIGNALS</p>
+      <h2>Recent Runs</h2>
+      {% if recent_runs %}
+        <ul class="run-list">
+          {% for run in recent_runs %}
+            <li>
+              <a href="{{ url_for('view_run', run_id=run.run_id) }}">{{ run.run_id }}</a>
+              <span>Score {{ run.global_score }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        <a class="secondary-link" href="{{ url_for('runs') }}">View all recent runs</a>
+      {% else %}
+        <p class="muted">No previous runs found.</p>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

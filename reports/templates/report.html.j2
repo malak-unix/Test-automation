@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Automation Report {{ final_results.run_id }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #5f6b7a;
+      --line: #d8dee8;
+      --bg: #f7f9fc;
+      --panel: #ffffff;
+      --accent: #0f766e;
+      --high: #b42318;
+      --medium: #b7791f;
+      --low: #2563eb;
+      --info: #475569;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    header {
+      background: #111827;
+      color: #ffffff;
+      padding: 28px 36px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 44px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 10px;
+    }
+    h1 {
+      font-size: 28px;
+    }
+    h2 {
+      font-size: 20px;
+      margin-top: 28px;
+    }
+    .meta, .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    header .meta {
+      color: #d1d5db;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+    .card, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .card strong {
+      display: block;
+      font-size: 24px;
+      margin-top: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    th {
+      background: #eef2f7;
+      font-weight: 700;
+    }
+    .status, .severity {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #e5e7eb;
+    }
+    .severity-high { color: var(--high); }
+    .severity-medium { color: var(--medium); }
+    .severity-low { color: var(--low); }
+    .severity-info { color: var(--info); }
+    ul {
+      margin-top: 8px;
+    }
+    footer {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px 32px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LangGraph Test Automation Report</h1>
+    <div class="meta">
+      Run ID: {{ final_results.run_id }} |
+      Generated at: {{ final_results.generated_at }} |
+      Target URL: {{ final_results.target_url or "Not provided" }}
+    </div>
+    <div class="meta">
+      Framework: {{ final_results.project_info.get("framework") or "Unknown" }} |
+      Language: {{ final_results.project_info.get("language") or "Unknown" }}
+    </div>
+  </header>
+
+  <main>
+    {% set k = final_results.kpis %}
+    <div class="grid">
+      <div class="card"><span>Global score</span><strong>{{ k.global_score }}</strong></div>
+      <div class="card"><span>API pass rate</span><strong>{{ k.pass_rate }}%</strong></div>
+      <div class="card"><span>UI pass rate</span><strong>{{ k.ui_pass_rate }}%</strong></div>
+      <div class="card"><span>Performance tests</span><strong>{{ k.total_performance_tests }}</strong></div>
+      <div class="card"><span>Perf p95 ms</span><strong>{{ k.p95_response_time_ms or "n/a" }}</strong></div>
+      <div class="card"><span>Total API tests</span><strong>{{ k.total_api_tests }}</strong></div>
+      <div class="card"><span>Total UI tests</span><strong>{{ k.total_ui_tests }}</strong></div>
+      <div class="card"><span>Screenshots</span><strong>{{ k.screenshot_count }}</strong></div>
+      <div class="card"><span>Total anomalies</span><strong>{{ k.total_anomalies }}</strong></div>
+      <div class="card"><span>High anomalies</span><strong>{{ k.high_anomalies }}</strong></div>
+      <div class="card"><span>Recommendations</span><strong>{{ k.recommendation_count }}</strong></div>
+    </div>
+
+    <section>
+      <h2>Project</h2>
+      <table>
+        <tbody>
+          <tr><th>Language</th><td>{{ final_results.project_info.get("language") or "Unknown" }}</td></tr>
+          <tr><th>Framework</th><td>{{ final_results.project_info.get("framework") or "Unknown" }}</td></tr>
+          <tr><th>Auth type</th><td>{{ final_results.project_info.get("auth_type") or "Unknown" }}</td></tr>
+          <tr><th>Has API</th><td>{{ final_results.project_info.get("has_api") }}</td></tr>
+          <tr><th>Has UI</th><td>{{ final_results.project_info.get("has_ui") }}</td></tr>
+          <tr><th>Docs/API/UI files</th><td>
+            {{ (final_results.project_info.get("candidate_docs") or [])|length }} docs,
+            {{ (final_results.project_info.get("candidate_api_files") or [])|length }} API files,
+            {{ (final_results.project_info.get("candidate_ui_files") or [])|length }} UI files
+          </td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Plan</h2>
+      {% set plan = final_results.test_plan_summary %}
+      <p class="muted">Scope: {{ plan.scope }}</p>
+      <table>
+        <tbody>
+          <tr><th>API tests</th><td>{{ plan.api_tests }}</td></tr>
+          <tr><th>UI tests</th><td>{{ plan.ui_tests }}</td></tr>
+          <tr><th>Performance tests</th><td>{{ plan.performance_tests }}</td></tr>
+        </tbody>
+      </table>
+      {% if plan.missing_information %}
+      <h3>Missing Information</h3>
+      <ul>{% for item in plan.missing_information %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if plan.risks %}
+      <h3>Risks</h3>
+      <ul>{% for item in plan.risks %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>API Results</h2>
+      {% set api_section = (final_results.sections | selectattr("title", "equalto", "API Testing") | list | first) %}
+      <p class="muted">Status: {{ api_section.get("status") if api_section else "missing" }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Method</th><th>Endpoint</th><th>Status</th>
+            <th>Expected</th><th>Actual</th><th>Duration ms</th><th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for test in api_section.get("items", []) if api_section %}
+          <tr>
+            <td>{{ test.get("id") }}</td>
+            <td>{{ test.get("name") }}</td>
+            <td>{{ test.get("method") }}</td>
+            <td>{{ test.get("endpoint") }}</td>
+            <td><span class="status">{{ test.get("status") }}</span></td>
+            <td>{{ test.get("expected_status") }}</td>
+            <td>{{ test.get("actual_status") }}</td>
+            <td>{{ test.get("duration_ms") }}</td>
+            <td>{{ test.get("details") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9">No API results available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>UI Results</h2>
+      {% set ui_section = (final_results.sections | selectattr("title", "equalto", "UI Testing") | list | first) %}
+      <p class="muted">Status: {{ ui_section.get("status") if ui_section else "missing" }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Flow</th><th>Status</th><th>Target URL</th>
+            <th>Duration ms</th><th>Details</th><th>Screenshot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for test in ui_section.get("items", []) if ui_section %}
+          <tr>
+            <td>{{ test.get("id") }}</td>
+            <td>{{ test.get("name") }}</td>
+            <td>{{ test.get("flow") }}</td>
+            <td><span class="status">{{ test.get("status") }}</span></td>
+            <td>{{ test.get("target_url") }}</td>
+            <td>{{ test.get("duration_ms") }}</td>
+            <td>{{ test.get("details") }}</td>
+            <td>{{ test.get("screenshot_path") or "" }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8">No UI results available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>UI Screenshots</h2>
+      {% set screenshot_section = (final_results.sections | selectattr("title", "equalto", "UI Screenshots") | list | first) %}
+      <table>
+        <thead><tr><th>Path</th><th>Reason</th><th>Created</th></tr></thead>
+        <tbody>
+          {% for screenshot in screenshot_section.get("items", []) if screenshot_section %}
+          <tr>
+            <td>{{ screenshot.get("path") }}</td>
+            <td>{{ screenshot.get("reason") }}</td>
+            <td>{{ screenshot.get("created") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3">No screenshot paths were recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Performance Results</h2>
+      {% set perf_section = (final_results.sections | selectattr("title", "equalto", "Performance Testing") | list | first) %}
+      <p class="muted">Status: {{ perf_section.get("status") if perf_section else "missing" }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Endpoint</th><th>Users</th><th>Duration s</th>
+            <th>Requests</th><th>Failures</th><th>Failure rate</th>
+            <th>Avg ms</th><th>P95 ms</th><th>Status</th><th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for test in perf_section.get("items", []) if perf_section %}
+          <tr>
+            <td>{{ test.get("id") }}</td>
+            <td>{{ test.get("name") }}</td>
+            <td>{{ test.get("endpoint") }}</td>
+            <td>{{ test.get("users") }}</td>
+            <td>{{ test.get("duration_seconds") }}</td>
+            <td>{{ test.get("total_requests") }}</td>
+            <td>{{ test.get("failures") }}</td>
+            <td>{{ test.get("failure_rate") }}</td>
+            <td>{{ test.get("average_response_time_ms") }}</td>
+            <td>{{ test.get("p95_response_time_ms") }}</td>
+            <td><span class="status">{{ test.get("status") }}</span></td>
+            <td>{{ test.get("details") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="12">No performance results available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Bug Analysis</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Severity</th><th>Classification</th><th>Title</th>
+            <th>Source</th><th>Recommendation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for anomaly in final_results.anomalies %}
+          <tr>
+            <td>{{ anomaly.get("id") }}</td>
+            <td class="severity severity-{{ anomaly.get("severity") }}">{{ anomaly.get("severity") }}</td>
+            <td>{{ anomaly.get("classification") }}</td>
+            <td>{{ anomaly.get("title") }}</td>
+            <td>{{ anomaly.get("source_agent") }}</td>
+            <td>{{ anomaly.get("recommendation") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6">No anomalies were available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Recommendations</h2>
+      <table>
+        <thead><tr><th>Priority</th><th>Title</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for item in final_results.recommendations %}
+          <tr>
+            <td>{{ item.get("priority") }}</td>
+            <td>{{ item.get("title") }}</td>
+            <td>{{ item.get("action") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3">No recommendations were generated.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Limitations</h2>
+      <ul>
+        {% for item in final_results.limitations %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    Generated by LangGraph-Based Multi-Agent Test Automation System
+  </footer>
+</body>
+</html>

@@ -1,0 +1,116 @@
+project:
+  name: "SMA Test Automation"
+  default_execution_mode: "sequential"
+
+target:
+  default_repo_url: "https://github.com/Vitaee/DjangoRestAPI"
+  default_target_url: "http://localhost:8000"
+
+github:
+  default_repo_url: "https://github.com/Vitaee/DjangoRestAPI"
+  token_env_var: "GITHUB_TOKEN"
+  default_branch_env_var: "GITHUB_DEFAULT_BRANCH"
+  require_token_for_public_repos: false
+
+testing:
+  default_test_types:
+    - api
+  max_duration_minutes: 5
+
+results:
+  base_dir: "results"
+
+rag:
+  top_k: 8
+  chunk_size: 1200
+  chunk_overlap: 150
+  embedding_backend: "local_hash"
+  vector_dimensions: 256
+  default_query: "JWT authentication todo CRUD API tests"
+
+planner:
+  default_mode: "deterministic_fallback"
+  allow_llm: false
+  max_api_tests: 8
+  max_ui_tests: 4
+  max_performance_tests: 1
+  require_evidence_sources: true
+  llm_temperature: 0
+
+api_testing:
+  timeout_seconds: 5
+  skip_dynamic_endpoints: true
+  allow_mutating_api_tests_by_default: false
+  max_response_preview_chars: 500
+  default_headers:
+    Accept: "application/json"
+
+ui_testing:
+  browser: "chrome"
+  headless: true
+  timeout_seconds: 10
+  screenshot_on_failure: true
+  screenshots_dir: "screenshots"
+  max_text_preview_chars: 300
+  skip_if_browser_unavailable: true
+
+performance_testing:
+  enabled: false
+  default_users: 5
+  default_spawn_rate: 1
+  default_duration_seconds: 15
+  max_users: 20
+  max_duration_seconds: 60
+  allow_external_targets_by_default: false
+  max_avg_response_ms: 2000
+  max_p95_response_ms: 5000
+  max_failure_rate_percent: 5.0
+  artifacts_dir: "performance"
+
+bug_analysis:
+  pass_rate_high_risk_threshold: 50
+  pass_rate_medium_risk_threshold: 80
+  slow_response_ms_threshold: 2000
+  classify_auth_bypass_as_high: true
+  include_skipped_as_info: true
+  use_llm_explanations: false
+
+reporting:
+  output_dir: "reports/generated"
+  template_name: "report.html.j2"
+  include_retrieved_context_preview: true
+  include_ui_results: true
+  include_screenshot_paths: true
+  include_performance_results: true
+  include_performance_artifacts: true
+  max_table_rows: 50
+  global_score:
+    failed_test_penalty: 5
+    api_error_penalty: 3
+    high_anomaly_penalty: 15
+    medium_anomaly_penalty: 8
+    low_anomaly_penalty: 3
+
+dashboard:
+  host: "127.0.0.1"
+  port: 5000
+  default_repo_url: "https://github.com/Vitaee/DjangoRestAPI"
+  default_target_url: "http://localhost:8000"
+  default_focus: "JWT authentication todo CRUD API tests"
+  recent_runs_limit: 10
+  iframe_height_px: 900
+
+mcp:
+  enabled: false
+  config_path: "config/mcp_config.example.json"
+  fallback_to_local_tools: true
+  testing_server:
+    transport: "stdio"
+    command: "python"
+    args:
+      - "mcp_servers/testing_tools_server.py"
+
+llm:
+  provider_env_var: "LLM_PROVIDER"
+  groq_api_key_env_var: "GROQ_API_KEY"
+  mistral_api_key_env_var: "MISTRAL_API_KEY"

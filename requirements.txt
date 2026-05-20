@@ -1,0 +1,17 @@
+langgraph
+pydantic
+pyyaml
+python-dotenv
+pytest
+jupyter
+ipykernel
+requests
+Jinja2
+Flask
+mcp
+langchain-mcp-adapters
+langchain-core
+langchain-groq
+langchain-mistralai
+selenium
+locust

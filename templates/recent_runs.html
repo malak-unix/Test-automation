@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Recent Runs{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="section-heading">
+    <p class="eyebrow">ARCHIVE</p>
+    <h2>Recent Runs</h2>
+    <p>Previously generated workflow reports.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Modified</th>
+        <th>Global score</th>
+        <th>API pass rate</th>
+        <th>UI pass rate</th>
+        <th>Perf failure rate</th>
+        <th>Screenshots</th>
+        <th>Total anomalies</th>
+        <th>Report</th>
+        <th>View</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in recent_runs %}
+      <tr>
+        <td>{{ run.run_id }}</td>
+        <td>{{ run.modified_at }}</td>
+        <td>{{ run.global_score }}</td>
+        <td>{{ run.api_pass_rate }}</td>
+        <td>{{ run.ui_pass_rate }}</td>
+        <td>{{ run.performance_failure_rate }}</td>
+        <td>{{ run.screenshot_count }}</td>
+        <td>{{ run.total_anomalies }}</td>
+        <td>{{ "yes" if run.report_html_path else "no" }}</td>
+        <td><a href="{{ url_for('view_run', run_id=run.run_id) }}">Open</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10">No recent runs found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
