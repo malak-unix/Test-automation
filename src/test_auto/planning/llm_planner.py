@@ -11,6 +11,9 @@ from test_auto.shared.schemas import ASSERTION_TYPES, TEST_CATEGORIES, TEST_PRIO
 from test_auto.shared.secrets import get_env_value, get_llm_config
 
 
+AGENT_MODE = "langchain_create_agent"
+
+
 def get_planner_llm_config() -> dict[str, Any]:
     """Return non-secret planner LLM availability metadata."""
 
@@ -110,7 +113,11 @@ def _normalize_llm_test_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
                 assertion_type = "custom"
             expected = assertion.get("expected")
             if expected is None:
-                expected = assertion.get("description") or assertion.get("target") or "expected behavior"
+                expected = (
+                    assertion.get("description")
+                    or assertion.get("target")
+                    or "expected behavior"
+                )
             repaired_assertions.append(
                 {
                     "type": assertion_type,
@@ -121,6 +128,52 @@ def _normalize_llm_test_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
         test_case["assertions"] = repaired_assertions
 
     return plan
+
+
+def _extract_message_content(message: Any) -> str:
+    if isinstance(message, dict):
+        return str(message.get("content", ""))
+    return str(getattr(message, "content", message))
+
+
+def _extract_last_agent_message_content(response: Any) -> str:
+    if isinstance(response, dict) and response.get("messages"):
+        return _extract_message_content(response["messages"][-1])
+    if hasattr(response, "messages") and response.messages:
+        return _extract_message_content(response.messages[-1])
+    return _extract_message_content(response)
+
+
+def _invoke_planner_agent(
+    llm: Any,
+    messages: list[dict[str, str]],
+    thread_id: str,
+) -> str:
+    try:
+        from langchain.agents import create_agent
+        from langgraph.checkpoint.memory import InMemorySaver
+    except Exception as error:
+        raise RuntimeError(
+            f"Planner LangChain agent dependency failed: {error.__class__.__name__}"
+        )
+
+    system_prompt = (
+        messages[0]["content"]
+        if messages and messages[0].get("role") == "system"
+        else None
+    )
+    agent_messages = messages[1:] if system_prompt else messages
+    agent = create_agent(
+        model=llm,
+        tools=[],
+        system_prompt=system_prompt,
+        checkpointer=InMemorySaver(),
+    )
+    response = agent.invoke(
+        {"messages": agent_messages},
+        config={"configurable": {"thread_id": thread_id or "test-planner"}},
+    )
+    return _extract_last_agent_message_content(response)
 
 
 def generate_llm_test_plan(
@@ -136,6 +189,7 @@ def generate_llm_test_plan(
     provider = config["provider"]
     model = config["model"]
     messages = build_test_planner_messages(context)
+    thread_id = str(context.get("run_id") or "test-planner")
     try:
         if provider == "groq":
             from langchain_groq import ChatGroq
@@ -158,11 +212,12 @@ def generate_llm_test_plan(
         else:
             raise RuntimeError("Unsupported LLM provider.")
     except Exception as error:
-        raise RuntimeError(f"Planner LLM dependency or setup failed: {error.__class__.__name__}")
+        raise RuntimeError(
+            f"Planner LLM dependency or setup failed: {error.__class__.__name__}"
+        )
 
     try:
-        response = llm.invoke(messages)
-        content = getattr(response, "content", response)
+        content = _invoke_planner_agent(llm, messages, thread_id)
         parsed = _extract_json(str(content))
         parsed = _normalize_llm_test_plan(parsed)
         return TestPlan(**parsed).model_dump(mode="json")
@@ -186,6 +241,7 @@ def plan_with_llm_or_fallback(
                     "mode": "llm",
                     "provider": config["provider"],
                     "model": config["model"],
+                    "agent_mode": AGENT_MODE,
                 },
             )
         except Exception as error:

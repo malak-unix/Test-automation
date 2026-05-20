@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from test_auto.planning import llm_planner
 from test_auto.agents.test_planner import (
     load_planner_context_from_run_dir,
     run_test_planner_alone,
@@ -147,3 +148,28 @@ def test_no_secret_exposure_in_model_info(tmp_path: Path, monkeypatch) -> None:
     )
 
     assert "placeholder" not in json.dumps(result["planner_model_info"])
+
+
+def test_llm_planner_imports_and_falls_back_without_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_MODEL", "fake-model")
+
+    context = {
+        "project_info": fake_project_info(),
+        "discovered_endpoints": fake_endpoints(),
+        "discovered_ui_flows": fake_ui_flows(),
+        "retrieved_context": fake_context(),
+        "user_preferences": {"test_types": ["api"]},
+        "missing_information": [],
+    }
+    test_plan, model_info = llm_planner.plan_with_llm_or_fallback(
+        context,
+        context,
+    )
+
+    assert test_plan["api_tests"]
+    assert model_info["mode"] == "deterministic_fallback"
+    assert model_info["provider"] == "none"
+    assert model_info["model"] is None
+    assert "reason" in model_info
