@@ -82,12 +82,40 @@ def clone_repository(repo_url: str, run_id: str, results_dir: str = "results") -
             "error": "repo_url must be a GitHub HTTPS or SSH URL.",
         }
     if destination.exists():
-        return {
-            "status": "success",
-            "repo_path": str(destination),
-            "details": "Repository destination already exists; clone skipped.",
-            "error": None,
-        }
+        if not destination.is_dir():
+            return {
+                "status": "error",
+                "repo_path": str(destination),
+                "details": "Repository destination exists but is not a directory.",
+                "error": "repo clone destination is not a directory.",
+            }
+        if not any(destination.iterdir()):
+            # A previous failed MCP/local clone can leave an empty repo folder.
+            # Git clone should run again instead of treating that folder as usable.
+            try:
+                destination.rmdir()
+            except OSError as error:
+                return {
+                    "status": "error",
+                    "repo_path": str(destination),
+                    "details": "Empty repository destination could not be reset before cloning.",
+                    "error": str(error),
+                }
+        else:
+            readable_files = list_project_files(str(destination), max_files=1)
+            if (destination / ".git").exists() or readable_files:
+                return {
+                    "status": "success",
+                    "repo_path": str(destination),
+                    "details": "Repository destination already contains project files; clone skipped.",
+                    "error": None,
+                }
+            return {
+                "status": "error",
+                "repo_path": str(destination),
+                "details": "Repository destination exists but does not look like a readable project.",
+                "error": "repo clone destination is not empty and has no readable project files.",
+            }
 
     ensure_directory(destination.parent)
     try:

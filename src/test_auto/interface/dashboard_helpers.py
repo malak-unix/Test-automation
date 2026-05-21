@@ -127,6 +127,7 @@ def load_run_summary(run_id: str) -> dict[str, Any]:
         return {}
 
     final_results = _safe_load_json(run_dir / "final_results.json")
+    workflow_state = _safe_load_json(run_dir / "workflow_state.json")
     if final_results:
         kpis = final_results.get("kpis") or {}
         report_html_path = safe_artifact_path(
@@ -155,9 +156,26 @@ def load_run_summary(run_id: str) -> dict[str, Any]:
                 "warnings": final_results.get("limitations") or [],
             }
         )
+        if workflow_state:
+            from test_auto.interface.run_service import summarize_final_state
+
+            trace_summary = summarize_final_state(workflow_state)
+            summary.update(
+                {
+                    "selected_agents": trace_summary.get("selected_agents", []),
+                    "planner_model_info": trace_summary.get("planner_model_info", {}),
+                    "rag_trace": trace_summary.get("rag_trace", []),
+                    "test_plan_trace": trace_summary.get("test_plan_trace", {}),
+                    "mcp_events": trace_summary.get("mcp_events", []),
+                    "tool_backend_metadata": trace_summary.get("tool_backend_metadata", {}),
+                    "use_mcp_tools": trace_summary.get("use_mcp_tools", False),
+                    "mcp_fallback_used": trace_summary.get("mcp_fallback_used", False),
+                    "agent_logs": trace_summary.get("agent_logs", []),
+                    "agent_log_count": trace_summary.get("agent_log_count", 0),
+                }
+            )
         return mask_sensitive_for_display(summary)
 
-    workflow_state = _safe_load_json(run_dir / "workflow_state.json")
     if not workflow_state:
         return {}
     from test_auto.interface.run_service import summarize_final_state

@@ -12,6 +12,7 @@ Architecture in one place:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from pathlib import Path
@@ -41,22 +42,76 @@ from test_auto.graph.state import TestAutomationState
 from test_auto.shared.utils import generate_run_id, save_workflow_state
 
 
-def build_graph():
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
+def _node_status_from_update(update: dict[str, Any]) -> str:
+    logs = update.get("agent_logs") or []
+    if logs and isinstance(logs[-1], dict):
+        return str(logs[-1].get("status") or "success")
+    if update.get("errors"):
+        return "partial"
+    return "success"
+
+
+def _wrap_node(
+    name: str,
+    node_func: Callable[[TestAutomationState], dict[str, Any]],
+    progress_callback: ProgressCallback | None,
+) -> Callable[[TestAutomationState], dict[str, Any]]:
+    if progress_callback is None:
+        return node_func
+
+    def wrapped(state: TestAutomationState) -> dict[str, Any]:
+        progress_callback(
+            {
+                "agent": name,
+                "status": "running",
+                "message": f"{name} started.",
+            }
+        )
+        try:
+            update = node_func(state)
+        except Exception as error:
+            progress_callback(
+                {
+                    "agent": name,
+                    "status": "error",
+                    "message": f"{name} failed: {error.__class__.__name__}",
+                }
+            )
+            raise
+        progress_callback(
+            {
+                "agent": name,
+                "status": _node_status_from_update(update),
+                "message": f"{name} completed.",
+            }
+        )
+        return update
+
+    return wrapped
+
+
+def build_graph(progress_callback: ProgressCallback | None = None):
     """Build the full integrated workflow through Report Agent."""
 
     workflow = StateGraph(TestAutomationState)
 
     # Each node is one agent. Nodes communicate only through TestAutomationState,
     # so every agent stays testable alone and in the integrated workflow.
-    workflow.add_node("orchestrator", orchestrator_node)
-    workflow.add_node("repo_analyzer", repo_analyzer_node)
-    workflow.add_node("rag", rag_node)
-    workflow.add_node("test_planner", test_planner_node)
-    workflow.add_node("api_testing", api_testing_node)
-    workflow.add_node("ui_testing", ui_testing_node)
-    workflow.add_node("performance_testing", performance_testing_node)
-    workflow.add_node("bug_analysis", bug_analysis_node)
-    workflow.add_node("report", report_node)
+    workflow.add_node("orchestrator", _wrap_node("orchestrator", orchestrator_node, progress_callback))
+    workflow.add_node("repo_analyzer", _wrap_node("repo_analyzer", repo_analyzer_node, progress_callback))
+    workflow.add_node("rag", _wrap_node("rag", rag_node, progress_callback))
+    workflow.add_node("test_planner", _wrap_node("test_planner", test_planner_node, progress_callback))
+    workflow.add_node("api_testing", _wrap_node("api_testing", api_testing_node, progress_callback))
+    workflow.add_node("ui_testing", _wrap_node("ui_testing", ui_testing_node, progress_callback))
+    workflow.add_node(
+        "performance_testing",
+        _wrap_node("performance_testing", performance_testing_node, progress_callback),
+    )
+    workflow.add_node("bug_analysis", _wrap_node("bug_analysis", bug_analysis_node, progress_callback))
+    workflow.add_node("report", _wrap_node("report", report_node, progress_callback))
 
     # The normal happy path is:
     # START -> orchestrator -> repo_analyzer -> rag -> test_planner
@@ -143,10 +198,13 @@ def build_graph():
     return workflow.compile()
 
 
-def run_workflow(initial_state: TestAutomationState) -> dict[str, Any]:
+def run_workflow(
+    initial_state: TestAutomationState,
+    progress_callback: ProgressCallback | None = None,
+) -> dict[str, Any]:
     """Run the integrated workflow and save final State."""
 
-    graph = build_graph()
+    graph = build_graph(progress_callback=progress_callback)
     final_state = graph.invoke(initial_state)
     run_id = final_state.get("run_id") or generate_run_id()
     final_state["run_id"] = run_id

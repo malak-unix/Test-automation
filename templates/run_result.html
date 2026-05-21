@@ -20,6 +20,95 @@
   </div>
 </section>
 
+{% if summary.get("planner_model_info", {}).get("llm_response_preview") %}
+<section class="panel console-panel">
+  <p class="eyebrow">LLM RESPONSE</p>
+  <h2>Reponse brute du Test Planner</h2>
+  <p class="muted">
+    Provider: {{ summary.get("planner_model_info", {}).get("provider", "none") }}
+    / Model: {{ summary.get("planner_model_info", {}).get("model") or "none" }}.
+    {% if summary.get("planner_model_info", {}).get("llm_response_truncated") %}
+      Apercu tronque pour garder le dashboard lisible.
+    {% endif %}
+  </p>
+  <pre class="llm-response">{{ summary.get("planner_model_info", {}).get("llm_response_preview") }}</pre>
+</section>
+{% endif %}
+
+<section class="panel">
+  <p class="eyebrow">TRACEABILITE IA</p>
+  <h2>Preuves RAG, LLM et plan genere</h2>
+  <div class="trace-grid">
+    <div>
+      <h3>1. Contexte RAG envoye au planner</h3>
+      {% if summary.rag_trace %}
+        <ol class="trace-list">
+          {% for chunk in summary.rag_trace[:5] %}
+          <li>
+            <strong>{{ chunk.source }}</strong>
+            {% if chunk.score %}<span class="status-pill">score {{ chunk.score }}</span>{% endif %}
+            <p>{{ chunk.preview or "No preview available." }}</p>
+          </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="muted">Aucun contexte RAG compact disponible dans ce run.</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <h3>2. Plan de test genere par Test Planner</h3>
+      {% set plan = summary.test_plan_trace or {} %}
+      <p><strong>Scope:</strong> {{ plan.scope or "Not available" }}</p>
+      {% if plan.reasoning_summary %}<p class="muted">{{ plan.reasoning_summary }}</p>{% endif %}
+      <table>
+        <thead><tr><th>Type</th><th>ID</th><th>Name</th><th>Method/Flow</th><th>Endpoint/Expected</th></tr></thead>
+        <tbody>
+          {% for test in plan.api_tests or [] %}
+          <tr><td>API</td><td>{{ test.id }}</td><td>{{ test.name }}</td><td>{{ test.method }}</td><td>{{ test.endpoint }} -> {{ test.expected_status }}</td></tr>
+          {% endfor %}
+          {% for test in plan.ui_tests or [] %}
+          <tr><td>UI</td><td>{{ test.id }}</td><td>{{ test.name }}</td><td>{{ test.flow }}</td><td>{{ test.expected_result }}</td></tr>
+          {% endfor %}
+          {% for test in plan.performance_tests or [] %}
+          <tr><td>Performance</td><td>{{ test.id }}</td><td>{{ test.name }}</td><td>{{ test.method }}</td><td>{{ test.endpoint }}</td></tr>
+          {% endfor %}
+          {% if not plan.api_tests and not plan.ui_tests and not plan.performance_tests %}
+          <tr><td colspan="5">No compact test plan items available.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">TRACEABILITE OUTILS</p>
+  <h2>Utilisation MCP</h2>
+  <p class="muted">
+    MCP est la couche d'outils externe. Le tableau montre quand un agent a appele un outil MCP
+    et si un fallback local a ete utilise.
+  </p>
+  {% if summary.mcp_events %}
+    <table>
+      <thead><tr><th>Agent</th><th>Tool</th><th>MCP used</th><th>Fallback</th><th>Error</th></tr></thead>
+      <tbody>
+        {% for event in summary.mcp_events %}
+        <tr>
+          <td>{{ event.agent }}</td>
+          <td>{{ event.tool }}</td>
+          <td>{{ "yes" if event.used_mcp else "no" }}</td>
+          <td>{{ "yes" if event.fallback_used else "no" }}</td>
+          <td>{{ event.error or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Aucun evenement MCP detaille n'a ete enregistre pour ce run.</p>
+  {% endif %}
+</section>
+
 <section class="panel workflow-panel">
   <div class="section-heading">
     <p class="eyebrow">EXECUTION TOPOLOGY</p>

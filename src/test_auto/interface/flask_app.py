@@ -46,21 +46,14 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.post("/run")
     def run():
-        result = run_service.run_and_summarize(request.form)
-        if result.get("status") == "error":
-            return (
-                render_template(
-                    "error.html",
-                    error=result.get("error", "Workflow failed."),
-                    errors=result.get("errors", []),
-                ),
-                500,
-            )
-        return render_template(
-            "run_result.html",
-            summary=result.get("summary", {}),
-            report_html=result.get("report_html", ""),
-        )
+        job_id = run_service.start_workflow_job(request.form)
+        return render_template("live_run.html", job_id=job_id)
+
+    @app.get("/api/runs/<job_id>/status")
+    def run_status(job_id: str):
+        snapshot = run_service.get_workflow_job(job_id)
+        status_code = 404 if snapshot.get("status") == "not_found" else 200
+        return jsonify(snapshot), status_code
 
     @app.get("/runs")
     def runs():

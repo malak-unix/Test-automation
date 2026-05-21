@@ -3,118 +3,164 @@
 {% block title %}Run Test Automation{% endblock %}
 
 {% block content %}
-<section class="panel workflow-panel">
+<section class="panel hero-panel">
   <div class="section-heading">
-    <p class="eyebrow">MODE SIMPLE</p>
-    <h2>Pipeline Agent Par Agent</h2>
-    <p><strong>Final MVP Workflow:</strong> chaque bloc travaille dans l'ordre. Le projet utilise le LLM Groq/Mistral pour generer le plan de test dans <strong>Test Planner</strong>.</p>
+    <p class="eyebrow">MODE GUIDE</p>
+    <h2>Dashboard de test automatique</h2>
+    <p>
+      Remplis seulement le depot GitHub et l'URL de l'application cible. Le systeme lance les agents
+      dans l'ordre, utilise le LLM pour creer le plan de test, puis utilise les outils MCP quand ils
+      sont disponibles.
+    </p>
+    <p class="muted">Final MVP Workflow: Orchestrator -> Repository -> RAG -> Test Planner -> API -> UI -> Performance -> Bug Analysis -> Report.</p>
   </div>
   <div class="agent-flow" aria-label="Final workflow">
-    <span title="Valide la demande et choisit les agents">1 Orchestrator</span>
-    <span title="Clone/lit le repo sans executer son code">2 Repository</span>
-    <span title="Prepare le contexte depuis les fichiers">3 RAG</span>
-    <span title="Cree le plan de test; seul agent qui peut appeler Groq/Mistral">4 Test Planner</span>
-    <span title="Execute les tests API planifies">5 API</span>
-    <span title="Execute les tests UI planifies avec Selenium">6 UI</span>
+    <span title="Valide la demande">1 Orchestrator</span>
+    <span title="Analyse les fichiers du repo sans executer le projet">2 Repository</span>
+    <span title="Recupere le contexte utile">3 RAG</span>
+    <span title="Genere le plan avec Groq/Mistral">4 Test Planner + LLM</span>
+    <span title="Execute les tests API">5 API</span>
+    <span title="Execute les tests UI Selenium">6 UI</span>
     <span title="Execute une petite charge Locust locale">7 Performance</span>
-    <span title="Classe les anomalies">8 Bug Analysis</span>
-    <span title="Genere le rapport final">9 Report</span>
+    <span title="Classe les problemes">8 Bug Analysis</span>
+    <span title="Genere le rapport">9 Report</span>
   </div>
 </section>
 
 <section class="layout">
   <form class="panel form-panel" method="post" action="{{ url_for('run') }}">
     <div class="section-heading">
-      <p class="eyebrow">MISSION INPUT</p>
-      <h2>Run Test Automation</h2>
-      <p>Launch repository analysis, RAG, planning, API/UI/performance checks, bug analysis, and report generation.</p>
+      <p class="eyebrow">LANCER UNE ANALYSE</p>
+      <h2>Configuration simple</h2>
+      <p>Les options techniques sont cachees dans "Parametres avances" pour garder la demo lisible.</p>
     </div>
 
-    <label>
-      GitHub Repository URL
-      <input type="url" name="repo_url" value="{{ defaults.repo_url }}" placeholder="https://github.com/Vitaee/DjangoRestAPI">
-      <span class="helper-text">Public repositories do not require a GitHub token. Private repositories may require <code>GITHUB_TOKEN</code> in <code>.env</code>.</span>
-    </label>
+    <div class="form-step">
+      <span class="step-badge">1</span>
+      <div>
+        <label>
+          GitHub Repository URL
+          <input type="url" name="repo_url" value="{{ defaults.repo_url }}" placeholder="https://github.com/Vitaee/DjangoRestAPI">
+          <span class="helper-text">Depot public: aucun token GitHub requis. Depot prive: utiliser <code>GITHUB_TOKEN</code> dans <code>.env</code>, jamais dans le dashboard.</span>
+        </label>
 
-    <label>
-      Local repository path <span class="muted">optional</span>
-      <input type="text" name="repo_path" placeholder="../DjangoRestAPI">
-      <span class="helper-text">When provided, the local path is used instead of cloning the GitHub URL.</span>
-    </label>
-
-    <label>
-      Target app URL
-      <input type="url" name="target_url" value="{{ defaults.target_url }}" required>
-    </label>
-
-    <label>
-      Focus
-      <input type="text" name="focus" value="{{ defaults.focus }}">
-    </label>
-
-    <div class="field-group">
-      <span class="label-text">Test types</span>
-      <label class="check-row"><input type="checkbox" name="test_types" value="api" checked> API</label>
-      <label class="check-row"><input type="checkbox" name="test_types" value="ui" checked> UI <span>Selenium, si navigateur disponible</span></label>
-      <label class="check-row"><input type="checkbox" name="test_types" value="performance" checked> Performance <span>petite charge Locust locale</span></label>
+        <label>
+          Local repository path <span class="muted">optionnel</span>
+          <input type="text" name="repo_path" placeholder="../DjangoRestAPI">
+          <span class="helper-text">Si ce champ est rempli, le systeme analyse ce dossier local au lieu de cloner GitHub.</span>
+        </label>
+      </div>
     </div>
 
-    <div class="grid-2">
-      <label>
-        Execution mode
-        <select name="execution_mode">
-          <option value="sequential" selected>Sequential</option>
-        </select>
-      </label>
+    <div class="form-step">
+      <span class="step-badge">2</span>
+      <div>
+        <label>
+          Target app URL
+          <input type="url" name="target_url" value="{{ defaults.target_url }}" required>
+          <span class="helper-text">URL de l'application deja lancee. Le dashboard ne demarre pas Django/Docker automatiquement.</span>
+        </label>
 
-      <label>
-        RAG top k
-        <input type="number" name="rag_top_k" min="1" max="20" value="{{ defaults.rag_top_k }}">
-      </label>
+        <label>
+          Focus de test
+          <input type="text" name="focus" value="{{ defaults.focus }}">
+          <span class="helper-text">Sujet donne au RAG et au Test Planner pour orienter les tests.</span>
+        </label>
+      </div>
     </div>
 
-    <div class="field-group">
-      <span class="label-text">Planner mode</span>
-      <input type="hidden" name="planner_use_llm" value="1">
-      <p class="llm-banner">LLM obligatoire: Test Planner appelle Groq/Mistral avec les variables de <code>.env</code>. Les autres agents executent le plan avec des outils.</p>
-      <p class="helper-text">
-        LLM status:
-        provider <strong>{{ llm_config.provider or "none" }}</strong>,
-        model <strong>{{ llm_config.model or "not configured" }}</strong>,
-        available <strong>{{ "yes" if llm_config.available else "no" }}</strong>.
-      </p>
+    <div class="form-step">
+      <span class="step-badge">3</span>
+      <div class="field-group">
+        <span class="label-text">Tests a executer</span>
+        <label class="check-row"><input type="checkbox" name="test_types" value="api" checked> API <span>requêtes HTTP planifiees</span></label>
+        <label class="check-row"><input type="checkbox" name="test_types" value="ui" checked> UI <span>Selenium, si navigateur disponible</span></label>
+        <label class="check-row"><input type="checkbox" name="test_types" value="performance" checked> Performance <span>petite charge Locust locale</span></label>
+      </div>
     </div>
 
-    <div class="field-group">
-      <label class="check-row"><input type="checkbox" name="allow_mutating_api_tests"> Allow mutating API tests</label>
-      <p class="warning">POST/PUT/PATCH/DELETE are skipped unless enabled.</p>
-      <label class="check-row"><input type="checkbox" name="allow_external_performance_test"> Allow external performance target</label>
-      <p class="warning">Performance tests use small safe loads by default and run only against localhost unless explicitly allowed.</p>
-      <label class="check-row"><input type="checkbox" name="skip_ui_testing"> Skip UI Testing</label>
-      <label class="check-row"><input type="checkbox" name="skip_performance_testing"> Skip Performance Testing</label>
-      <label class="check-row"><input type="checkbox" name="skip_bug_analysis"> Skip Bug Analysis</label>
-      <label class="check-row"><input type="checkbox" name="skip_report"> Skip Report</label>
-      <label class="check-row"><input type="checkbox" name="use_mcp_tools"> Use MCP tools when available</label>
+    <div class="system-status-grid">
+      <div class="status-card">
+        <span>LLM</span>
+        <strong>Obligatoire</strong>
+        <p>{{ llm_config.provider or "provider non configure" }} / {{ llm_config.model or "modele non configure" }}</p>
+      </div>
+      <div class="status-card">
+        <span>MCP</span>
+        <strong>Active</strong>
+        <p>Les agents utilisent les outils MCP disponibles, avec fallback local si le serveur MCP est indisponible.</p>
+      </div>
     </div>
 
-    <button type="submit">Run Test Automation</button>
+    <input type="hidden" name="planner_use_llm" value="1">
+    <input type="hidden" name="use_mcp_tools" value="1">
+
+    <details class="advanced-panel">
+      <summary>Parametres avances, a laisser par defaut pour la demo</summary>
+
+      <div class="grid-2 advanced-grid">
+        <label>
+          Execution mode
+          <select name="execution_mode">
+            <option value="sequential" selected>Sequential</option>
+            <option value="parallel">Parallel</option>
+          </select>
+          <span class="helper-text">Sequential = agents lances un par un. C'est le mode recommande pour comprendre la trace.</span>
+        </label>
+
+        <label>
+          RAG top k
+          <input type="number" name="rag_top_k" value="{{ defaults.rag_top_k }}" min="1" max="20">
+          <span class="helper-text">Nombre de morceaux de code/documents recuperes par RAG pour aider le LLM. 8 est un bon choix.</span>
+        </label>
+      </div>
+
+      <div class="field-group">
+        <label class="check-row"><input type="checkbox" name="allow_mutating_api_tests"> Autoriser POST/PUT/PATCH/DELETE</label>
+        <p class="warning">A garder decoche en demo: les tests mutating peuvent modifier les donnees de l'application.</p>
+
+        <label class="check-row"><input type="checkbox" name="allow_external_performance_test"> Autoriser performance sur cible externe</label>
+        <p class="warning">A garder decoche: Locust teste uniquement localhost par defaut pour eviter tout abus.</p>
+
+        <label class="check-row"><input type="checkbox" name="skip_ui_testing"> Skip UI Testing</label>
+        <label class="check-row"><input type="checkbox" name="skip_performance_testing"> Skip Performance Testing</label>
+        <label class="check-row"><input type="checkbox" name="skip_bug_analysis"> Skip Bug Analysis</label>
+        <label class="check-row"><input type="checkbox" name="skip_report"> Skip Report</label>
+      </div>
+    </details>
+
+    <button type="submit">Lancer le workflow complet</button>
   </form>
 
   <div class="side-stack">
     <aside class="panel console-panel">
       <p class="eyebrow">GUIDE RAPIDE</p>
-      <h2>Comment lire le dashboard</h2>
+      <h2>Ce que fait chaque partie</h2>
       <ol class="quick-guide">
-        <li><strong>Selected agents</strong>: agents vraiment lances.</li>
-        <li><strong>Planner mode</strong>: LLM obligatoire pour Test Planner.</li>
-        <li><strong>Artifact paths</strong>: fichiers JSON crees par chaque agent.</li>
-        <li><strong>Report viewer</strong>: rapport final lisible pour la presentation.</li>
+        <li><strong>GitHub Repository URL</strong>: depot a analyser, clone en lecture seule.</li>
+        <li><strong>Target app URL</strong>: application deja lancee, par exemple <code>http://localhost:8000</code>.</li>
+        <li><strong>RAG top k</strong>: quantite de contexte envoyee au planner LLM.</li>
+        <li><strong>MCP active</strong>: outils externes standardises utilises quand disponibles.</li>
+        <li><strong>Artifacts</strong>: JSON et rapport HTML generes dans <code>results/runs/</code>.</li>
       </ol>
     </aside>
 
     <aside class="panel console-panel">
-      <p class="eyebrow">RECENT SIGNALS</p>
-      <h2>Recent Runs</h2>
+      <p class="eyebrow">ARCHITECTURE</p>
+      <h2>Qui utilise quoi ?</h2>
+      <dl class="mini-explain">
+        <dt>LangGraph</dt>
+        <dd>Orchestre les agents avec State, Nodes et Edges.</dd>
+        <dt>LangChain</dt>
+        <dd>Appelle Groq/Mistral dans le Test Planner.</dd>
+        <dt>MCP</dt>
+        <dd>Expose des outils externes reutilisables pour certains agents.</dd>
+      </dl>
+    </aside>
+
+    <aside class="panel console-panel">
+      <p class="eyebrow">RECENT RUNS</p>
+      <h2>Dernieres executions</h2>
       {% if recent_runs %}
         <ul class="run-list">
           {% for run in recent_runs %}
@@ -124,9 +170,9 @@
             </li>
           {% endfor %}
         </ul>
-        <a class="secondary-link" href="{{ url_for('runs') }}">View all recent runs</a>
+        <a class="secondary-link" href="{{ url_for('runs') }}">Voir tous les runs</a>
       {% else %}
-        <p class="muted">No previous runs found.</p>
+        <p class="muted">Aucune execution precedente.</p>
       {% endif %}
     </aside>
   </div>

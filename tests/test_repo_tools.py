@@ -4,6 +4,7 @@ from pathlib import Path
 
 from test_auto.tools.repo_tools import (
     build_project_info,
+    clone_repository,
     detect_language_and_framework,
     discover_python_endpoints,
     discover_ui_flows,
@@ -179,3 +180,31 @@ def test_build_project_info_combines_candidates(tmp_path: Path) -> None:
     assert project_info["has_api"] is True
     assert project_info["has_ui"] is True
     assert "README.md" in project_info["candidate_docs"]
+
+
+def test_clone_repository_retries_empty_existing_destination(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_id = "run_empty_clone"
+    destination = tmp_path / "runs" / run_id / "repo"
+    destination.mkdir(parents=True)
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        destination.mkdir(parents=True, exist_ok=True)
+        write_file(destination, "README.md", "demo")
+
+    monkeypatch.setattr("test_auto.tools.repo_tools.subprocess.run", fake_run)
+
+    result = clone_repository(
+        "https://github.com/example/repo",
+        run_id,
+        results_dir=str(tmp_path),
+    )
+
+    assert result["status"] == "success"
+    assert result["details"] == "Repository cloned successfully."
+    assert calls
+    assert "README.md" in list_project_files(str(destination))

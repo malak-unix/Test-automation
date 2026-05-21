@@ -6,28 +6,39 @@
   <title>Test Automation Report {{ final_results.run_id }}</title>
   <style>
     :root {
-      color-scheme: light;
-      --ink: #1d2430;
-      --muted: #5f6b7a;
-      --line: #d8dee8;
-      --bg: #f7f9fc;
-      --panel: #ffffff;
-      --accent: #0f766e;
-      --high: #b42318;
-      --medium: #b7791f;
-      --low: #2563eb;
-      --info: #475569;
+      color-scheme: dark;
+      --bg: #030806;
+      --panel: #07110d;
+      --panel-2: #0a1812;
+      --ink: #d9ffe9;
+      --muted: #86a99a;
+      --line: #164c34;
+      --grid: rgba(34, 197, 94, 0.11);
+      --neon: #39ff88;
+      --cyan: #22d3ee;
+      --purple: #a855f7;
+      --high: #fb7185;
+      --medium: #facc15;
+      --low: #38bdf8;
+      --info: #c4b5fd;
     }
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: Consolas, "Courier New", monospace;
       color: var(--ink);
-      background: var(--bg);
+      background:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+        radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 35%),
+        var(--bg);
+      background-size: 36px 36px, 36px 36px, auto, auto;
       line-height: 1.5;
     }
     header {
-      background: #111827;
-      color: #ffffff;
+      background: rgba(3, 8, 6, 0.96);
+      border-bottom: 1px solid var(--neon);
+      box-shadow: 0 0 30px rgba(57, 255, 136, 0.13);
+      color: var(--ink);
       padding: 28px 36px;
     }
     main {
@@ -40,17 +51,19 @@
     }
     h1 {
       font-size: 28px;
+      color: var(--neon);
     }
     h2 {
       font-size: 20px;
       margin-top: 28px;
+      color: var(--ink);
     }
     .meta, .muted {
       color: var(--muted);
       font-size: 14px;
     }
     header .meta {
-      color: #d1d5db;
+      color: var(--muted);
     }
     .grid {
       display: grid;
@@ -59,12 +72,14 @@
       margin: 22px 0;
     }
     .card, section {
-      background: var(--panel);
+      background: linear-gradient(180deg, rgba(10, 24, 18, 0.97), rgba(4, 12, 8, 0.97));
       border: 1px solid var(--line);
       border-radius: 8px;
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
       padding: 18px;
     }
     .card strong {
+      color: var(--cyan);
       display: block;
       font-size: 24px;
       margin-top: 6px;
@@ -83,7 +98,8 @@
       word-break: break-word;
     }
     th {
-      background: #eef2f7;
+      background: rgba(57, 255, 136, 0.08);
+      color: var(--neon);
       font-weight: 700;
     }
     .status, .severity {
@@ -92,7 +108,9 @@
       padding: 2px 8px;
       font-size: 12px;
       font-weight: 700;
-      background: #e5e7eb;
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.42);
+      color: #e9d5ff;
     }
     .severity-high { color: var(--high); }
     .severity-medium { color: var(--medium); }
@@ -107,6 +125,15 @@
       padding: 0 24px 32px;
       color: var(--muted);
       font-size: 13px;
+    }
+    .explain-box {
+      border-left: 3px solid var(--cyan);
+      color: var(--muted);
+      margin: 10px 0 16px;
+      padding-left: 12px;
+    }
+    .explain-box strong {
+      color: var(--neon);
     }
   </style>
 </head>
@@ -134,7 +161,6 @@
       <div class="card"><span>Perf p95 ms</span><strong>{{ k.p95_response_time_ms or "n/a" }}</strong></div>
       <div class="card"><span>Total API tests</span><strong>{{ k.total_api_tests }}</strong></div>
       <div class="card"><span>Total UI tests</span><strong>{{ k.total_ui_tests }}</strong></div>
-      <div class="card"><span>Screenshots</span><strong>{{ k.screenshot_count }}</strong></div>
       <div class="card"><span>Total anomalies</span><strong>{{ k.total_anomalies }}</strong></div>
       <div class="card"><span>High anomalies</span><strong>{{ k.high_anomalies }}</strong></div>
       <div class="card"><span>Recommendations</span><strong>{{ k.recommendation_count }}</strong></div>
@@ -218,7 +244,7 @@
         <thead>
           <tr>
             <th>ID</th><th>Name</th><th>Flow</th><th>Status</th><th>Target URL</th>
-            <th>Duration ms</th><th>Details</th><th>Screenshot</th>
+            <th>Duration ms</th><th>Details</th>
           </tr>
         </thead>
         <tbody>
@@ -231,29 +257,9 @@
             <td>{{ test.get("target_url") }}</td>
             <td>{{ test.get("duration_ms") }}</td>
             <td>{{ test.get("details") }}</td>
-            <td>{{ test.get("screenshot_path") or "" }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="8">No UI results available.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>UI Screenshots</h2>
-      {% set screenshot_section = (final_results.sections | selectattr("title", "equalto", "UI Screenshots") | list | first) %}
-      <table>
-        <thead><tr><th>Path</th><th>Reason</th><th>Created</th></tr></thead>
-        <tbody>
-          {% for screenshot in screenshot_section.get("items", []) if screenshot_section %}
-          <tr>
-            <td>{{ screenshot.get("path") }}</td>
-            <td>{{ screenshot.get("reason") }}</td>
-            <td>{{ screenshot.get("created") }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3">No screenshot paths were recorded.</td></tr>
+          <tr><td colspan="7">No UI results available.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -296,6 +302,13 @@
 
     <section>
       <h2>Bug Analysis</h2>
+      <div class="explain-box">
+        <strong>Role:</strong> this agent reads API, UI, and Performance results, then applies deterministic Python rules
+        from the analysis layer. It does not guess manually: each row is created from a failed, skipped, or abnormal test result.
+        <br>
+        <strong>Tooling:</strong> rule functions classify status codes, environment errors, skipped tests, UI assertions,
+        and performance thresholds. The Source column shows which testing agent produced the evidence.
+      </div>
       <table>
         <thead>
           <tr>
@@ -322,6 +335,10 @@
 
     <section>
       <h2>Recommendations</h2>
+      <div class="explain-box">
+        Recommendations are generated by grouping Bug Analysis anomalies by severity and classification.
+        The action text comes from deterministic templates in the recommendation builder, using the anomaly evidence.
+      </div>
       <table>
         <thead><tr><th>Priority</th><th>Title</th><th>Action</th></tr></thead>
         <tbody>

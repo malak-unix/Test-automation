@@ -89,6 +89,34 @@ def _normalize_llm_test_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
         "normal": "medium",
         "minor": "low",
     }
+
+    def _text_list(value: Any) -> list[str]:
+        """Convert common LLM list variants into the strict string lists we store."""
+
+        if not isinstance(value, list):
+            return []
+        normalized: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                normalized.append(item)
+            elif isinstance(item, dict):
+                text = (
+                    item.get("reason")
+                    or item.get("item")
+                    or item.get("description")
+                    or item.get("message")
+                    or item.get("name")
+                    or item.get("id")
+                )
+                if text is not None:
+                    normalized.append(str(text))
+            elif item is not None:
+                normalized.append(str(item))
+        return normalized
+
+    for key in ("assumptions", "excluded_tests", "missing_information", "risks"):
+        plan[key] = _text_list(plan.get(key))
+
     for test_case in plan.get("api_tests") or []:
         if not isinstance(test_case, dict):
             continue
@@ -119,6 +147,44 @@ def _normalize_llm_test_plan(raw_plan: dict[str, Any]) -> dict[str, Any]:
                 }
             )
         test_case["assertions"] = repaired_assertions
+        test_case["evidence_sources"] = _text_list(test_case.get("evidence_sources"))
+        test_case["risks"] = _text_list(test_case.get("risks"))
+
+    for test_case in plan.get("ui_tests") or []:
+        if not isinstance(test_case, dict):
+            continue
+        priority = str(test_case.get("priority") or "medium").strip().lower()
+        test_case["priority"] = priority_aliases.get(priority, priority)
+        if test_case["priority"] not in TEST_PRIORITIES:
+            test_case["priority"] = "medium"
+        test_case["flow"] = str(
+            test_case.get("flow")
+            or test_case.get("flow_name")
+            or test_case.get("flow_type")
+            or test_case.get("name")
+            or "ui_flow"
+        )
+        assertions = test_case.get("assertions") or []
+        first_assertion = assertions[0] if assertions and isinstance(assertions[0], dict) else {}
+        test_case["expected_result"] = str(
+            test_case.get("expected_result")
+            or first_assertion.get("expected")
+            or first_assertion.get("target")
+            or test_case.get("objective")
+            or "UI flow behaves as expected."
+        )
+        steps = test_case.get("steps") or []
+        test_case["steps"] = [str(step) for step in steps] if isinstance(steps, list) else [str(steps)]
+        test_case["evidence_sources"] = _text_list(test_case.get("evidence_sources"))
+        test_case["risks"] = _text_list(test_case.get("risks"))
+
+    for test_case in plan.get("performance_tests") or []:
+        if not isinstance(test_case, dict):
+            continue
+        test_case["endpoint"] = str(test_case.get("endpoint") or "/")
+        test_case["objective"] = str(test_case.get("objective") or "Measure baseline response time safely.")
+        test_case["evidence_sources"] = _text_list(test_case.get("evidence_sources"))
+        test_case["risks"] = _text_list(test_case.get("risks"))
 
     return plan
 
@@ -128,6 +194,16 @@ def generate_llm_test_plan(
     timeout_seconds: int = 30,
 ) -> dict[str, Any]:
     """Generate a TestPlan with Groq or Mistral when safely configured."""
+
+    test_plan, _metadata = generate_llm_test_plan_with_metadata(context, timeout_seconds)
+    return test_plan
+
+
+def generate_llm_test_plan_with_metadata(
+    context: dict[str, Any],
+    timeout_seconds: int = 30,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Generate a TestPlan and return safe metadata about the raw LLM reply."""
 
     config = get_planner_llm_config()
     if not config["available"]:
@@ -163,9 +239,17 @@ def generate_llm_test_plan(
     try:
         response = llm.invoke(messages)
         content = getattr(response, "content", response)
-        parsed = _extract_json(str(content))
+        raw_response = str(content)
+        parsed = _extract_json(raw_response)
         parsed = _normalize_llm_test_plan(parsed)
-        return TestPlan(**parsed).model_dump(mode="json")
+        return (
+            TestPlan(**parsed).model_dump(mode="json"),
+            {
+                "llm_response_preview": raw_response[:6000],
+                "llm_response_characters": len(raw_response),
+                "llm_response_truncated": len(raw_response) > 6000,
+            },
+        )
     except Exception as error:
         raise RuntimeError(f"LLM planning failed: {error.__class__.__name__}")
 
@@ -179,13 +263,14 @@ def plan_with_llm_or_fallback(
     config = get_planner_llm_config()
     if config["available"]:
         try:
-            test_plan = generate_llm_test_plan(context)
+            test_plan, llm_metadata = generate_llm_test_plan_with_metadata(context)
             return (
                 test_plan,
                 {
                     "mode": "llm",
                     "provider": config["provider"],
                     "model": config["model"],
+                    **llm_metadata,
                 },
             )
         except Exception as error:

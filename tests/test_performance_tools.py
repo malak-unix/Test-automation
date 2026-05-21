@@ -136,6 +136,48 @@ def test_run_locust_subprocess_missing_locust(tmp_path: Path, monkeypatch) -> No
     assert result["error_type"] == "configuration_error"
 
 
+def test_run_locust_subprocess_nonzero_with_csv_is_parsed_as_success(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    locustfile = tmp_path / "locustfile.py"
+    locustfile.write_text("from locust import HttpUser\n", encoding="utf-8")
+
+    def fake_run(*args, **kwargs):
+        csv_path = (
+            tmp_path
+            / "results"
+            / "runs"
+            / "locust_http_failures"
+            / "performance"
+            / "PERF_001_stats.csv"
+        )
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        csv_path.write_text(
+            "Type,Name,Request Count,Failure Count,Average Response Time,Min Response Time,Max Response Time,Requests/s,50%,95%\n"
+            "GET,/missing/,4,4,10,8,12,1,10,12\n"
+            ",Aggregated,4,4,10,8,12,1,10,12\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(args[0], 1, stdout="", stderr="HTTP failures")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = run_locust_subprocess(
+        locustfile_path=str(locustfile),
+        target_url="http://localhost:8000",
+        users=1,
+        spawn_rate=1,
+        duration_seconds=1,
+        run_id="locust_http_failures",
+        test_id="PERF_001",
+    )
+
+    assert result["status"] == "success"
+    assert "HTTP failures" in result["error"]
+
+
 def test_execute_performance_test_case_zero_requests_environment_error(
     tmp_path: Path,
     monkeypatch,

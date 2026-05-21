@@ -357,6 +357,16 @@ def run_locust_subprocess(
     if completed.returncode != 0:
         lowered = f"{stdout_preview}\n{stderr_preview}".lower()
         error_type = "configuration_error" if "no module named locust" in lowered else "environment_error"
+        if Path(f"{csv_prefix}_stats.csv").exists():
+            return {
+                "status": "success",
+                "error_type": None,
+                "csv_prefix": str(csv_prefix),
+                "stdout_preview": stdout_preview,
+                "stderr_preview": stderr_preview,
+                "returncode": completed.returncode,
+                "error": "Locust completed with HTTP failures captured in CSV metrics.",
+            }
         return {
             "status": "error",
             "error_type": error_type,

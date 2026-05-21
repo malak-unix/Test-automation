@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Running{% endblock %}
+
+{% block content %}
+<section class="panel hero-panel">
+  <div class="section-heading">
+    <p class="eyebrow">WORKFLOW EN DIRECT</p>
+    <h2>Execution agent par agent</h2>
+    <p>
+      Le workflow tourne en arriere-plan. Cette page affiche chaque agent au moment ou il demarre
+      et quand il termine. Aucune cle API ni secret n'est affiche.
+    </p>
+  </div>
+  <p><strong>Job:</strong> <code id="job-id">{{ job_id }}</code> - <span class="status-pill" id="job-status">queued</span></p>
+</section>
+
+<section class="grid-panels">
+  <div class="panel console-panel">
+    <p class="eyebrow">LIVE TIMELINE</p>
+    <h2>Progression des agents</h2>
+    <ol class="timeline" id="live-events">
+      <li>
+        <span class="timeline-index">0</span>
+        <div>
+          <strong>dashboard</strong>
+          <span class="status-pill">queued</span>
+          <p>Workflow envoye au serveur Flask.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="panel console-panel">
+    <p class="eyebrow">GUIDE</p>
+    <h2>Comment lire cette page</h2>
+    <ol class="quick-guide">
+      <li><strong>running</strong>: l'agent travaille maintenant.</li>
+      <li><strong>success</strong>: l'agent a fini correctement.</li>
+      <li><strong>partial</strong>: l'agent a fini mais avec limites ou erreurs d'environnement.</li>
+      <li><strong>error</strong>: l'agent a echoue sans exposer de secret.</li>
+    </ol>
+    <p class="muted">Quand le rapport final est pret, le bouton apparait automatiquement.</p>
+    <p id="result-link-wrap" class="hidden">
+      <a class="run-button" id="result-link" href="#">Ouvrir le rapport final</a>
+    </p>
+  </div>
+</section>
+
+<script>
+  const jobId = "{{ job_id }}";
+  const statusEl = document.getElementById("job-status");
+  const eventsEl = document.getElementById("live-events");
+  const resultWrap = document.getElementById("result-link-wrap");
+  const resultLink = document.getElementById("result-link");
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function eventHtml(event, index) {
+    const agent = escapeHtml(event.agent || "agent");
+    const status = escapeHtml(event.status || "unknown");
+    const message = escapeHtml(event.message || "");
+    const timestamp = event.timestamp ? `<small>${escapeHtml(event.timestamp)}</small>` : "";
+    return `
+      <li>
+        <span class="timeline-index">${index}</span>
+        <div>
+          <strong>${agent}</strong>
+          <span class="status-pill">${status}</span>
+          ${timestamp}
+          <p>${message}</p>
+        </div>
+      </li>
+    `;
+  }
+
+  async function refreshStatus() {
+    const response = await fetch(`/api/runs/${jobId}/status`, { cache: "no-store" });
+    const data = await response.json();
+    statusEl.textContent = data.status || "unknown";
+    const events = data.events || [];
+    if (events.length) {
+      eventsEl.innerHTML = events.map((event, index) => eventHtml(event, index + 1)).join("");
+    }
+    if (data.status === "completed" && data.result_url) {
+      resultLink.href = data.result_url;
+      resultWrap.classList.remove("hidden");
+      clearInterval(window.__workflowPoller);
+      setTimeout(() => { window.location.href = data.result_url; }, 1600);
+    }
+    if (data.status === "error") {
+      clearInterval(window.__workflowPoller);
+    }
+  }
+
+  window.__workflowPoller = setInterval(refreshStatus, 1000);
+  refreshStatus();
+</script>
+{% endblock %}

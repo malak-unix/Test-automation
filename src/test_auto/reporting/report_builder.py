@@ -30,7 +30,6 @@ def _compact_api_test(test: dict[str, Any]) -> dict[str, Any]:
 
 
 def _compact_ui_test(test: dict[str, Any]) -> dict[str, Any]:
-    screenshot = test.get("screenshot")
     return {
         "id": test.get("id"),
         "name": test.get("name"),
@@ -40,7 +39,6 @@ def _compact_ui_test(test: dict[str, Any]) -> dict[str, Any]:
         "target_url": test.get("target_url"),
         "duration_ms": test.get("duration_ms"),
         "details": test.get("details"),
-        "screenshot_path": screenshot.get("path") if isinstance(screenshot, dict) else None,
     }
 
 
@@ -305,7 +303,6 @@ def build_final_results(context: dict[str, Any]) -> dict[str, Any]:
         build_test_plan_section(test_plan),
         build_api_section(api_results),
         build_ui_section(ui_results),
-        build_screenshot_section(screenshots),
         build_performance_section(performance_results),
         build_bug_section(bug_results),
     ]

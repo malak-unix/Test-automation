@@ -42,27 +42,9 @@ def test_recent_runs_route(client) -> None:
 
 
 def test_run_route_with_mocked_workflow(client, monkeypatch) -> None:
-    def fake_run_and_summarize(form_data):
-        return {
-            "status": "success",
-            "summary": {
-                "run_id": "mock_run",
-                "status": "success",
-                "selected_agents": ["report"],
-                "framework": "Django REST Framework",
-                "target_url": "http://localhost:8000",
-                "global_score": 95,
-                "api_summary": {"total_tests": 1, "pass_rate": 100.0},
-                "bug_summary": {"total_anomalies": 0, "high": 0},
-                "recommendation_count": 0,
-                "errors": [],
-            },
-            "report_html": "<h1>Mock Report</h1>",
-        }
-
     monkeypatch.setattr(
-        "test_auto.interface.flask_app.run_service.run_and_summarize",
-        fake_run_and_summarize,
+        "test_auto.interface.flask_app.run_service.start_workflow_job",
+        lambda form_data: "dashboard_job_mock",
     )
     response = client.post(
         "/run",
@@ -70,26 +52,19 @@ def test_run_route_with_mocked_workflow(client, monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert b"mock_run" in response.data
-    assert b"Mock Report" in response.data
+    assert b"dashboard_job_mock" in response.data
+    assert b"Execution agent par agent" in response.data
 
 
 def test_run_route_handles_error(client, monkeypatch) -> None:
-    def fake_run_and_summarize(form_data):
-        return {
-            "status": "error",
-            "error": "Workflow failed safely.",
-            "errors": [{"agent": "dashboard", "field": "workflow", "message": "bad input"}],
-        }
-
     monkeypatch.setattr(
-        "test_auto.interface.flask_app.run_service.run_and_summarize",
-        fake_run_and_summarize,
+        "test_auto.interface.flask_app.run_service.get_workflow_job",
+        lambda job_id: {"job_id": job_id, "status": "error", "events": []},
     )
-    response = client.post("/run", data={"target_url": "http://localhost:8000"})
+    response = client.get("/api/runs/dashboard_job_error/status")
 
-    assert response.status_code == 500
-    assert b"Workflow failed safely" in response.data
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "error"
 
 
 def test_view_run_route_with_fake_run(client) -> None:
